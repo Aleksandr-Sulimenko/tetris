@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Tetris</title>
+    <style>
+        canvas {
+            border: 2px solid #333;
+        }
+        .game-info {
+            margin-left: 20px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+<canvas id="game" width="300" height="600"></canvas>
+<div class="game-info">
+    <p>Score: <span id="score">0</span></p>
+    <p>Level: <span id="level">1</span></p>
+</div>
+
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const BLOCK_SIZE = 30;
+    const COLORS = [
+        '#00ffff', // I
+        '#ffa500', // L
+        '#0000ff', // J
+        '#ffff00', // O
+        '#00ff00', // S
+        '#ff00ff', // T
+        '#ff0000'  // Z
+    ];
+    const SHAPES = [
+        [[1,1,1,1]],               // I
+        [[1,0,0], [1,1,1]],        // L
+        [[0,0,1], [1,1,1]],        // J
+        [[1,1], [1,1]],            // O
+        [[0,1,1], [1,1,0]],        // S
+        [[0,1,0], [1,1,1]],        // T
+        [[1,1,0], [0,1,1]]         // Z
+    ];
+
+    class Tetris {
+        constructor() {
+            this.width = 10;
+            this.height = 20;
+            this.grid = Array.from({length: this.height}, () => Array(this.width).fill(0));
+            this.score = 0;
+            this.level = 1;
+            this.currentPiece = null;
+            this.nextPiece = null;
+            this.gameOver = false;
+            this.spawnPiece();
+            this.dropInterval = 1000;
+            this.lastDrop = 0;
+        }
+
+        spawnPiece() {
+            if (!this.nextPiece) this.nextPiece = Math.floor(Math.random() * SHAPES.length);
+            this.currentPiece = {
+                shape: SHAPES[this.nextPiece],
+                color: COLORS[this.nextPiece],
+                x: Math.floor(this.width/2 - SHAPES[this.nextPiece][0].length/2),
+                y: 0
+            };
+            this.nextPiece = Math.floor(Math.random() * SHAPES.length);
+        }
+
+        checkCollision(shape, offsetX, offsetY) {
+            return shape.some((row, y) =>
+                row.some((cell, x) => {
+                    if (!cell) return false;
+                    const newX = x + offsetX;
+                    const newY = y + offsetY;
+                    return newX < 0 ||
+                        newX >= this.width ||
+                        newY >= this.height ||
+                        (newY >= 0 && this.grid[newY][newX]);
+                })
+            );
+        }
+
+        rotate() {
+            const shape = this.currentPiece.shape;
+            const rotated = shape[0].map((_, i) =>
+                shape.map(row => row[i]).reverse()
+            );
+            if (!this.checkCollision(rotated, this.currentPiece.x, this.currentPiece.y)) {
+                this.currentPiece.shape = rotated;
+            }
+        }
+
+        move(dx, dy) {
+            if (!this.checkCollision(this.currentPiece.shape,
+                this.currentPiece.x + dx,
+                this.currentPiece.y + dy)) {
+                this.currentPiece.x += dx;
+                this.currentPiece.y += dy;
+                return true;
+            }
+            return false;
+        }
+
+        drop() {
+            if (!this.move(0, 1)) {
+                this.placePiece();
+            }
+        }
+
+        placePiece() {
+            const {shape, color, x, y} = this.currentPiece;
+            shape.forEach((row, dy) => {
+                row.forEach((cell, dx) => {
+                    if (cell) {
+                        if (y + dy < 0) {
+                            this.gameOver = true;
+                            return;
+                        }
+                        this.grid[y + dy][x + dx] = color;
+                    }
+                });
+            });
+            this.clearLines();
+            this.spawnPiece();
+        }
+
+        clearLines() {
+            let linesCleared = 0;
+            this.grid = this.grid.filter(row => {
+                const full = row.every(cell => cell);
+                if (full) linesCleared++;
+                return !full;
+            });
+
+            while (this.grid.length < this.height) {
+                this.grid.unshift(Array(this.width).fill(0));
+            }
+
+            this.score += linesCleared ** 2 * 100;
+            this.level = 1 + Math.floor(this.score / 1000);
+            this.dropInterval = Math.max(50, 1000 - (this.level - 1) * 100);
+        }
+    }
+
+    // Game Initialization
+    const game = new Tetris();
+    let lastTime = 0;
+
+    function update(time = 0) {
+        if (!game.gameOver) {
+            const deltaTime = time - lastTime;
+
+            // Автоматическое падение
+            if (deltaTime > game.dropInterval) {
+                game.drop();
+                lastTime = time;
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        draw();
+        updateInfo();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Рисуем сетку
+        game.grid.forEach((row, y) => {
+            row.forEach((color, x) => {
+                if (color) {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
+                }
+            });
+        });
+
+        // Рисуем текущую фигуру
+        if (game.currentPiece) {
+            ctx.fillStyle = game.currentPiece.color;
+            game.currentPiece.shape.forEach((row, y) => {
+                row.forEach((cell, x) => {
+                    if (cell) {
+                        ctx.fillRect(
+                            (game.currentPiece.x + x) * BLOCK_SIZE,
+                            (game.currentPiece.y + y) * BLOCK_SIZE,
+                            BLOCK_SIZE-1,
+                            BLOCK_SIZE-1
+                        );
+                    }
+                });
+            });
+        }
+    }
+
+    function updateInfo() {
+        document.getElementById('score').textContent = game.score;
+        document.getElementById('level').textContent = game.level;
+    }
+
+    // Управление
+    document.addEventListener('keydown', event => {
+        if (game.gameOver) return;
+
+        switch(event.key) {
+            case 'ArrowLeft':
+                game.move(-1, 0);
+                break;
+            case 'ArrowRight':
+                game.move(1, 0);
+                break;
+            case 'ArrowDown':
+                game.move(0, 1);
+                break;
+            case 'ArrowUp':
+                game.rotate();
+                break;
+        }
+        draw();
+    });
+
+    // Запуск игры
+    requestAnimationFrame(update);
+</script>
+</body>
+</html>
