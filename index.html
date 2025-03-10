@@ -17,6 +17,7 @@
 <div class="game-info">
     <p>Score: <span id="score">0</span></p>
     <p>Level: <span id="level">1</span></p>
+    <p>Controls:  &#11013; &#10145; &#11015; - move, &#11014; - rotate, P - pause</p>
 </div>
 
 <script>
@@ -52,6 +53,7 @@
             this.currentPiece = null;
             this.nextPiece = null;
             this.gameOver = false;
+            this.isPaused = false;
             this.spawnPiece();
             this.dropInterval = 1000;
             this.lastDrop = 0;
@@ -149,7 +151,7 @@
     let lastTime = 0;
 
     function update(time = 0) {
-        if (!game.gameOver) {
+        if (!game.gameOver && !game.isPaused) {
             const deltaTime = time - lastTime;
 
             // Автоматическое падение
@@ -157,10 +159,9 @@
                 game.drop();
                 lastTime = time;
             }
-
-            requestAnimationFrame(update);
         }
 
+        requestAnimationFrame(update);
         draw();
         updateInfo();
     }
@@ -195,6 +196,26 @@
                 });
             });
         }
+
+        // Рисуем паузу
+        if (game.isPaused) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSE', canvas.width/2, canvas.height/2);
+        }
+
+        // Рисуем Game Over
+        if (game.gameOver) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'red';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2);
+        }
     }
 
     function updateInfo() {
@@ -206,18 +227,21 @@
     document.addEventListener('keydown', event => {
         if (game.gameOver) return;
 
-        switch(event.key) {
-            case 'ArrowLeft':
-                game.move(-1, 0);
+        switch(event.key.toLowerCase()) {
+            case 'arrowleft':
+                if (!game.isPaused) game.move(-1, 0);
                 break;
-            case 'ArrowRight':
-                game.move(1, 0);
+            case 'arrowright':
+                if (!game.isPaused) game.move(1, 0);
                 break;
-            case 'ArrowDown':
-                game.move(0, 1);
+            case 'arrowdown':
+                if (!game.isPaused) game.move(0, 1);
                 break;
-            case 'ArrowUp':
-                game.rotate();
+            case 'arrowup':
+                if (!game.isPaused) game.rotate();
+                break;
+            case 'p':
+                game.isPaused = !game.isPaused;
                 break;
         }
         draw();
