@@ -226,8 +226,11 @@
     // Управление
     document.addEventListener('keydown', event => {
         if (game.gameOver) return;
-
+        if (event.code === 'KeyP') { // <- проверяем код клавиши
+            game.isPaused = !game.isPaused;
+        }
         switch(event.key.toLowerCase()) {
+
             case 'arrowleft':
                 if (!game.isPaused) game.move(-1, 0);
                 break;
@@ -239,9 +242,6 @@
                 break;
             case 'arrowup':
                 if (!game.isPaused) game.rotate();
-                break;
-            case 'p':
-                game.isPaused = !game.isPaused;
                 break;
         }
         draw();
