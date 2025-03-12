@@ -10,13 +10,13 @@
             background: #ccc;
             padding: 0;
             margin: 0;
+            overflow: hidden; /* Убираем скролл */
         }
 
         .container {
             height: 100%;
         }
 
-        /* ... предыдущие стили ... */
         .game-container {
             display: flex;
             gap: 20px;
@@ -24,33 +24,63 @@
             justify-content: center;
             position: relative;
             height: 100%;
-
         }
+
         .title {
             display: flex;
             justify-content: center;
-            /*display: block;*/
         }
+
         #game {
             height: 70%;
         }
+
         #next-piece {
             height: 5%;
         }
-        #new-game-btn {
+
+        /* Стили для кнопок */
+        button {
             padding: 10px 20px;
             font-size: 18px;
-            background: #4CAF50;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             margin-top: 10px;
-            transition: background 0.3s;
+            transition: background 0.3s, transform 0.1s;
+            width: 150px; /* Фиксированная ширина */
+            text-align: center;
         }
 
-        #new-game-btn:hover {
+        button:hover {
+            transform: scale(1.05); /* Увеличение при наведении */
+        }
+
+        #start-btn {
+            background: #4CAF50; /* Зеленый цвет для кнопки "Старт" */
+        }
+
+        #start-btn:hover {
             background: #45a049;
+        }
+
+        #start-btn:disabled {
+            background: #ccc; /* Серый фон */
+            cursor: not-allowed; /* Курсор "запрещено" */
+        }
+
+        #pause-btn {
+            background: #FFA500; /* Оранжевый цвет для кнопки "Пауза" */
+        }
+
+        #pause-btn:hover {
+            background: #FF8C00;
+        }
+
+        #pause-btn:disabled {
+            background: #ccc; /* Серый цвет для заблокированной кнопки */
+            cursor: not-allowed;
         }
 
         #confirm-dialog {
@@ -62,7 +92,6 @@
             background-color: #cccccc;
             padding: 20px;
             border-radius: 10px;
-            /*color: white;*/
             text-align: center;
             z-index: 1000;
             flex-direction: column;
@@ -104,7 +133,10 @@
     <div class="game-container">
         <canvas id="game" width="300" height="600"></canvas>
         <div class="game-info">
-            <button id="new-game-btn"> Новая игра </button>
+            <!-- Кнопка "Старт/Новая игра" -->
+            <button id="start-btn">Старт</button>
+            <!-- Кнопка "Пауза/Продолжить", изначально заблокирована -->
+            <button id="pause-btn" disabled>Пауза</button>
             <p>Score: <span id="score">0</span></p>
             <p>Уровень: <span id="level">1</span></p>
             <canvas id="next-piece" width="120" height="120"></canvas>
@@ -112,7 +144,7 @@
         </div>
     </div>
 
-
+    <!-- Диалог подтверждения -->
     <div id="confirm-dialog">
         <p>Прервать текущую игру?</p>
         <div>
@@ -121,6 +153,7 @@
         </div>
     </div>
 
+    <!-- Анимация старта -->
     <div id="start-message">СТАРТ!</div>
 </div>
 
@@ -163,19 +196,18 @@
         }
 
         spawnPiece() {
-            if(this.gameOver) return;
+            if (this.gameOver) return;
 
             this.currentPiece = {
                 shape: SHAPES[this.nextPiece],
                 color: COLORS[this.nextPiece],
-                x: Math.floor(this.width/2 - SHAPES[this.nextPiece][0].length/2),
+                x: Math.floor(this.width / 2 - SHAPES[this.nextPiece][0].length / 2),
                 y: 0
             };
 
-            // Проверка коллизии при спавне
-            if(this.checkCollision(this.currentPiece.shape,
-                this.currentPiece.x, this.currentPiece.y)) {
+            if (this.checkCollision(this.currentPiece.shape, this.currentPiece.x, this.currentPiece.y)) {
                 this.gameOver = true;
+                pauseBtn.disabled = true; // Блокируем кнопку паузы при Game Over
                 return;
             }
 
@@ -185,7 +217,7 @@
         checkCollision(shape, offsetX, offsetY) {
             return shape.some((row, y) =>
                 row.some((cell, x) => {
-                    if(!cell) return false;
+                    if (!cell) return false;
                     const newX = x + offsetX;
                     const newY = y + offsetY;
                     return newX < 0 || newX >= this.width ||
@@ -196,25 +228,24 @@
         }
 
         rotate() {
-            if(this.gameOver || this.isPaused) return;
+            if (this.gameOver || this.isPaused) return;
 
             const rotated = this.currentPiece.shape[0]
                 .map((_, i) => this.currentPiece.shape
                     .map(row => row[i]).reverse());
 
-            if(!this.checkCollision(rotated,
-                this.currentPiece.x, this.currentPiece.y)) {
+            if (!this.checkCollision(rotated, this.currentPiece.x, this.currentPiece.y)) {
                 this.currentPiece.shape = rotated;
             }
         }
 
         move(dx, dy) {
-            if(this.gameOver || this.isPaused) return false;
+            if (this.gameOver || this.isPaused) return false;
 
             const newX = this.currentPiece.x + dx;
             const newY = this.currentPiece.y + dy;
 
-            if(!this.checkCollision(this.currentPiece.shape, newX, newY)) {
+            if (!this.checkCollision(this.currentPiece.shape, newX, newY)) {
                 this.currentPiece.x = newX;
                 this.currentPiece.y = newY;
                 return true;
@@ -223,22 +254,22 @@
         }
 
         drop() {
-            if(!this.move(0, 1)) this.placePiece();
+            if (!this.move(0, 1)) this.placePiece();
         }
 
         placePiece() {
-            const {shape, color, x, y} = this.currentPiece;
+            const { shape, color, x, y } = this.currentPiece;
 
-            // Проверка Game Over
-            if(shape.some((row, dy) =>
+            if (shape.some((row, dy) =>
                 row.some((cell, dx) => cell && (y + dy < 0)))) {
                 this.gameOver = true;
+                pauseBtn.disabled = true; // Блокируем кнопку паузы при Game Over
                 return;
             }
 
             shape.forEach((row, dy) => {
                 row.forEach((cell, dx) => {
-                    if(cell) this.grid[y + dy][x + dx] = color;
+                    if (cell) this.grid[y + dy][x + dx] = color;
                 });
             });
 
@@ -250,11 +281,11 @@
             let linesCleared = 0;
             this.grid = this.grid.filter(row => {
                 const full = row.every(cell => cell);
-                if(full) linesCleared++;
+                if (full) linesCleared++;
                 return !full;
             });
 
-            while(this.grid.length < this.height) {
+            while (this.grid.length < this.height) {
                 this.grid.unshift(Array(this.width).fill(0));
             }
 
@@ -278,13 +309,17 @@
 
     const game = new Tetris();
     let lastTime = 0;
+    let gameStarted = false; // Флаг для отслеживания начала игры
 
-    const newGameBtn = document.getElementById('new-game-btn');
+    // Элементы интерфейса
+    const startBtn = document.getElementById('start-btn');
+    const pauseBtn = document.getElementById('pause-btn');
     const confirmDialog = document.getElementById('confirm-dialog');
     const startMessage = document.getElementById('start-message');
     const confirmYes = document.getElementById('confirm-yes');
     const confirmNo = document.getElementById('confirm-no');
 
+    // Показ анимации старта
     function showStartAnimation() {
         startMessage.style.display = 'block';
         startMessage.style.animation = 'none';
@@ -295,6 +330,7 @@
         }, 1500);
     }
 
+    // Запуск новой игры
     function startNewGame() {
         game.reset();
         showStartAnimation();
@@ -302,27 +338,56 @@
         updateInfo();
         lastTime = performance.now();
         requestAnimationFrame(update);
+        pauseBtn.disabled = false; // Активируем кнопку паузы
+        pauseBtn.textContent = 'Пауза';
     }
 
-    newGameBtn.addEventListener('click', () => {
-        if(game.gameOver) {
+    // Обработчик кнопки "Старт/Новая игра"
+    startBtn.addEventListener('click', () => {
+        if (!gameStarted) {
             startNewGame();
+            gameStarted = true;
+            startBtn.textContent = 'Новая игра'; // Меняем текст после старта
+        } else if (game.isPaused) {
+            game.isPaused = false;
+            pauseBtn.textContent = 'Пауза';
+            lastTime = performance.now();
+            requestAnimationFrame(update);
         } else {
             game.isPaused = true;
-            confirmDialog.style.display = 'flex';
+            // startBtn.disabled = true;
+            pauseBtn.textContent = 'Продолжить';
+            confirmDialog.style.display = 'flex'; // Показываем диалог подтверждения
+            startBtn.disabled = true;
         }
     });
 
+    // Обработчик кнопки "Пауза/Продолжить"
+    pauseBtn.addEventListener('click', () => {
+        if (game.gameOver) return;
+        game.isPaused = !game.isPaused;
+        pauseBtn.textContent = game.isPaused ? 'Продолжить' : 'Пауза'; // Динамическое изменение текста
+        if (!game.isPaused) {
+            lastTime = performance.now();
+            requestAnimationFrame(update);
+        }
+    });
+
+    // Подтверждение новой игры
     confirmYes.addEventListener('click', () => {
         confirmDialog.style.display = 'none';
+        startBtn.disabled = false;
         startNewGame();
     });
 
+    // Отмена новой игры
     confirmNo.addEventListener('click', () => {
         confirmDialog.style.display = 'none';
-        game.isPaused = false;
+        startBtn.disabled = false;
+        // Игра остается на паузе
     });
 
+    // Отрисовка следующей фигуры
     function drawNextPiece() {
         nextCtx.fillStyle = '#000';
         nextCtx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
@@ -330,29 +395,32 @@
         const shape = SHAPES[game.nextPiece];
         const color = COLORS[game.nextPiece];
         const blockSize = PREVIEW_SIZE / 4;
-        const offsetX = Math.floor((4 - shape[0].length)/2);
-        const offsetY = Math.floor((4 - shape.length)/2);
+        const offsetX = Math.floor((4 - shape[0].length) / 2);
+        const offsetY = Math.floor((4 - shape.length) / 2);
 
         nextCtx.fillStyle = color;
         shape.forEach((row, y) =>
             row.forEach((cell, x) => {
-                if(cell) nextCtx.fillRect(
+                if (cell) nextCtx.fillRect(
                     (offsetX + x) * blockSize,
                     (offsetY + y) * blockSize,
-                    blockSize-1, blockSize-1
+                    blockSize - 1, blockSize - 1
                 );
             })
         );
     }
 
+    // Обновление игрового цикла
     function update(time = 0) {
-        if(game.gameOver) {
+        if (game.gameOver) {
             draw();
             return;
         }
 
+        if (game.isPaused) return;
+
         const deltaTime = time - lastTime;
-        if(deltaTime > game.dropInterval && !game.isPaused) {
+        if (deltaTime > game.dropInterval) {
             game.drop();
             lastTime = time;
             drawNextPiece();
@@ -363,65 +431,68 @@
         updateInfo();
     }
 
+    // Отрисовка игрового поля
     function draw() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Grid
         game.grid.forEach((row, y) =>
             row.forEach((color, x) => {
-                if(color) {
+                if (color) {
                     ctx.fillStyle = color;
                     ctx.fillRect(
                         x * BLOCK_SIZE,
                         y * BLOCK_SIZE,
-                        BLOCK_SIZE-1, BLOCK_SIZE-1
+                        BLOCK_SIZE - 1, BLOCK_SIZE - 1
                     );
                 }
             })
         );
 
-        // Current piece
-        if(game.currentPiece && !game.gameOver) {
+        if (game.currentPiece && !game.gameOver) {
             ctx.fillStyle = game.currentPiece.color;
             game.currentPiece.shape.forEach((row, y) =>
                 row.forEach((cell, x) => {
-                    if(cell) ctx.fillRect(
+                    if (cell) ctx.fillRect(
                         (game.currentPiece.x + x) * BLOCK_SIZE,
                         (game.currentPiece.y + y) * BLOCK_SIZE,
-                        BLOCK_SIZE-1, BLOCK_SIZE-1
+                        BLOCK_SIZE - 1, BLOCK_SIZE - 1
                     );
                 })
             );
         }
 
-        // Overlays
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        if(game.isPaused || game.gameOver) {
+        if (game.isPaused || game.gameOver) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = game.gameOver ? 'red' : 'white';
             ctx.font = '48px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(
                 game.gameOver ? 'GAME OVER' : 'PAUSE',
-                canvas.width/2, canvas.height/2
+                canvas.width / 2, canvas.height / 2
             );
         }
     }
 
+    // Обновление информации об очках и уровне
     function updateInfo() {
         document.getElementById('score').textContent = game.score;
         document.getElementById('level').textContent = game.level;
     }
 
-    // Controls
+    // Управление с клавиатуры
     document.addEventListener('keydown', e => {
-        if(game.gameOver) return;
-        if (e.code === 'KeyP') { // <- проверяем код клавиши
+        if (game.gameOver) return;
+        if (e.code === 'KeyP') {
             game.isPaused = !game.isPaused;
-            if (!game.isPaused) drawNextPiece();
+            pauseBtn.textContent = game.isPaused ? 'Продолжить' : 'Пауза'; // Синхронизация текста кнопки
+            if (!game.isPaused) {
+                lastTime = performance.now();
+                requestAnimationFrame(update);
+            }
         }
-        switch(e.key.toLowerCase()) {
+        switch (e.key.toLowerCase()) {
             case 'arrowleft': game.move(-1, 0); break;
             case 'arrowright': game.move(1, 0); break;
             case 'arrowdown': game.move(0, 1); break;
@@ -429,10 +500,9 @@
         }
         draw();
     });
-
-    // Start
+    draw();
+    // Изначально игра не запущена, показываем только следующую фигуру
     drawNextPiece();
-    requestAnimationFrame(update);
 </script>
 </body>
 </html>
