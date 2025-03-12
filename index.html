@@ -1,33 +1,127 @@
 <!DOCTYPE html>
+<meta charset="utf-8">
 <html>
 <head>
     <title>JavaScript Tetris</title>
     <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #ccc;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            height: 100%;
+        }
+
+        /* ... предыдущие стили ... */
         .game-container {
             display: flex;
             gap: 20px;
+            background-color: burlywood;
+            justify-content: center;
+            position: relative;
+            height: 100%;
+
         }
-        canvas {
-            border: 2px solid #333;
+        .title {
+            display: flex;
+            justify-content: center;
+            /*display: block;*/
         }
-        .game-info {
-            font-family: Arial, sans-serif;
+        #game {
+            height: 70%;
         }
         #next-piece {
-            margin-top: 20px;
+            height: 5%;
+        }
+        #new-game-btn {
+            padding: 10px 20px;
+            font-size: 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+
+        #new-game-btn:hover {
+            background: #45a049;
+        }
+
+        #confirm-dialog {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #cccccc;
+            padding: 20px;
+            border-radius: 10px;
+            /*color: white;*/
+            text-align: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #confirm-dialog button {
+            padding: 8px 20px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #start-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: #4CAF50;
+            opacity: 0;
+            pointer-events: none;
+            animation: startAnim 1.5s ease-out;
+            display: none;
+            z-index: 1001;
+        }
+
+        @keyframes startAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
         }
     </style>
 </head>
 <body>
-<div class="game-container">
-    <canvas id="game" width="300" height="600"></canvas>
-    <div class="game-info">
-        <p>Score: <span id="score">0</span></p>
-        <p>Level: <span id="level">1</span></p>
-        <p>Controls:  &#11013; &#10145; &#11015; - move, &#11014; - rotate, P - pause</p>
-        <canvas id="next-piece" width="120" height="120"></canvas>
-        <p>Next Piece:</p>
+<div class="container">
+    <h1 class="title">Тетрис</h1>
+    <div class="game-container">
+        <canvas id="game" width="300" height="600"></canvas>
+        <div class="game-info">
+            <button id="new-game-btn"> Новая игра </button>
+            <p>Score: <span id="score">0</span></p>
+            <p>Уровень: <span id="level">1</span></p>
+            <canvas id="next-piece" width="120" height="120"></canvas>
+            <p>Next Piece:</p>
+        </div>
     </div>
+
+
+    <div id="confirm-dialog">
+        <p>Прервать текущую игру?</p>
+        <div>
+            <button id="confirm-yes">Да</button>
+            <button id="confirm-no">Нет</button>
+        </div>
+    </div>
+
+    <div id="start-message">СТАРТ!</div>
 </div>
 
 <script>
@@ -168,10 +262,66 @@
             this.level = 1 + Math.floor(this.score / 1000);
             this.dropInterval = Math.max(50, 1000 - (this.level - 1) * 100);
         }
+
+        reset() {
+            this.grid = Array.from({length: this.height},
+                () => Array(this.width).fill(0));
+            this.score = 0;
+            this.level = 1;
+            this.gameOver = false;
+            this.isPaused = false;
+            this.nextPiece = Math.floor(Math.random() * SHAPES.length);
+            this.spawnPiece();
+            this.dropInterval = 1000;
+        }
     }
 
     const game = new Tetris();
     let lastTime = 0;
+
+    const newGameBtn = document.getElementById('new-game-btn');
+    const confirmDialog = document.getElementById('confirm-dialog');
+    const startMessage = document.getElementById('start-message');
+    const confirmYes = document.getElementById('confirm-yes');
+    const confirmNo = document.getElementById('confirm-no');
+
+    function showStartAnimation() {
+        startMessage.style.display = 'block';
+        startMessage.style.animation = 'none';
+        void startMessage.offsetWidth; // Trigger reflow
+        startMessage.style.animation = 'startAnim 1.5s ease-out';
+        setTimeout(() => {
+            startMessage.style.display = 'none';
+        }, 1500);
+    }
+
+    function startNewGame() {
+        game.reset();
+        showStartAnimation();
+        drawNextPiece();
+        updateInfo();
+        lastTime = performance.now();
+        requestAnimationFrame(update);
+    }
+
+    newGameBtn.addEventListener('click', () => {
+        if(game.gameOver) {
+            startNewGame();
+        } else {
+            game.isPaused = true;
+            confirmDialog.style.display = 'flex';
+        }
+    });
+
+    confirmYes.addEventListener('click', () => {
+        confirmDialog.style.display = 'none';
+        startNewGame();
+    });
+
+    confirmNo.addEventListener('click', () => {
+        confirmDialog.style.display = 'none';
+        game.isPaused = false;
+    });
 
     function drawNextPiece() {
         nextCtx.fillStyle = '#000';
