@@ -38,59 +38,63 @@
     const BLOCK_SIZE = 30;
     const PREVIEW_SIZE = 120;
     const COLORS = [
-        '#00ffff', // I
-        '#ffa500', // L
-        '#0000ff', // J
-        '#ffff00', // O
-        '#00ff00', // S
-        '#ff00ff', // T
-        '#ff0000'  // Z
+        '#00ffff', '#ffa500', '#0000ff',
+        '#ffff00', '#00ff00', '#ff00ff', '#ff0000'
     ];
     const SHAPES = [
-        [[1,1,1,1]],               // I
-        [[1,0,0], [1,1,1]],        // L
-        [[0,0,1], [1,1,1]],        // J
-        [[1,1], [1,1]],            // O
-        [[0,1,1], [1,1,0]],        // S
-        [[0,1,0], [1,1,1]],        // T
-        [[1,1,0], [0,1,1]]         // Z
+        [[1,1,1,1]], [[1,0,0],[1,1,1]], [[0,0,1],[1,1,1]],
+        [[1,1],[1,1]], [[0,1,1],[1,1,0]], [[0,1,0],[1,1,1]],
+        [[1,1,0],[0,1,1]]
     ];
 
     class Tetris {
         constructor() {
             this.width = 10;
             this.height = 20;
-            this.grid = Array.from({length: this.height}, () => Array(this.width).fill(0));
+            this.grid = Array.from({length: this.height},
+                () => Array(this.width).fill(0));
             this.score = 0;
             this.level = 1;
             this.currentPiece = null;
             this.nextPiece = null;
             this.gameOver = false;
             this.isPaused = false;
-            this.spawnPiece();
             this.dropInterval = 1000;
-            this.lastDrop = 0;
+            this.initGame();
+        }
+
+        initGame() {
+            this.nextPiece = Math.floor(Math.random() * SHAPES.length);
+            this.spawnPiece();
         }
 
         spawnPiece() {
-            if (!this.nextPiece) this.nextPiece = Math.floor(Math.random() * SHAPES.length);
+            if(this.gameOver) return;
+
             this.currentPiece = {
                 shape: SHAPES[this.nextPiece],
                 color: COLORS[this.nextPiece],
                 x: Math.floor(this.width/2 - SHAPES[this.nextPiece][0].length/2),
                 y: 0
             };
+
+            // Проверка коллизии при спавне
+            if(this.checkCollision(this.currentPiece.shape,
+                this.currentPiece.x, this.currentPiece.y)) {
+                this.gameOver = true;
+                return;
+            }
+
             this.nextPiece = Math.floor(Math.random() * SHAPES.length);
         }
 
         checkCollision(shape, offsetX, offsetY) {
             return shape.some((row, y) =>
                 row.some((cell, x) => {
-                    if (!cell) return false;
+                    if(!cell) return false;
                     const newX = x + offsetX;
                     const newY = y + offsetY;
-                    return newX < 0 ||
-                        newX >= this.width ||
+                    return newX < 0 || newX >= this.width ||
                         newY >= this.height ||
                         (newY >= 0 && this.grid[newY][newX]);
                 })
@@ -98,45 +102,52 @@
         }
 
         rotate() {
-            const shape = this.currentPiece.shape;
-            const rotated = shape[0].map((_, i) =>
-                shape.map(row => row[i]).reverse()
-            );
-            if (!this.checkCollision(rotated, this.currentPiece.x, this.currentPiece.y)) {
+            if(this.gameOver || this.isPaused) return;
+
+            const rotated = this.currentPiece.shape[0]
+                .map((_, i) => this.currentPiece.shape
+                    .map(row => row[i]).reverse());
+
+            if(!this.checkCollision(rotated,
+                this.currentPiece.x, this.currentPiece.y)) {
                 this.currentPiece.shape = rotated;
             }
         }
 
         move(dx, dy) {
-            if (!this.checkCollision(this.currentPiece.shape,
-                this.currentPiece.x + dx,
-                this.currentPiece.y + dy)) {
-                this.currentPiece.x += dx;
-                this.currentPiece.y += dy;
+            if(this.gameOver || this.isPaused) return false;
+
+            const newX = this.currentPiece.x + dx;
+            const newY = this.currentPiece.y + dy;
+
+            if(!this.checkCollision(this.currentPiece.shape, newX, newY)) {
+                this.currentPiece.x = newX;
+                this.currentPiece.y = newY;
                 return true;
             }
             return false;
         }
 
         drop() {
-            if (!this.move(0, 1)) {
-                this.placePiece();
-            }
+            if(!this.move(0, 1)) this.placePiece();
         }
 
         placePiece() {
             const {shape, color, x, y} = this.currentPiece;
+
+            // Проверка Game Over
+            if(shape.some((row, dy) =>
+                row.some((cell, dx) => cell && (y + dy < 0)))) {
+                this.gameOver = true;
+                return;
+            }
+
             shape.forEach((row, dy) => {
                 row.forEach((cell, dx) => {
-                    if (cell) {
-                        if (y + dy < 0.1) {
-                            this.gameOver = true;
-                            return;
-                        }
-                        this.grid[y + dy][x + dx] = color;
-                    }
+                    if(cell) this.grid[y + dy][x + dx] = color;
                 });
             });
+
             this.clearLines();
             this.spawnPiece();
         }
@@ -145,11 +156,11 @@
             let linesCleared = 0;
             this.grid = this.grid.filter(row => {
                 const full = row.every(cell => cell);
-                if (full) linesCleared++;
+                if(full) linesCleared++;
                 return !full;
             });
 
-            while (this.grid.length < this.height) {
+            while(this.grid.length < this.height) {
                 this.grid.unshift(Array(this.width).fill(0));
             }
 
@@ -169,37 +180,32 @@
         const shape = SHAPES[game.nextPiece];
         const color = COLORS[game.nextPiece];
         const blockSize = PREVIEW_SIZE / 4;
-
-        // Центрирование фигуры
-        const shapeWidth = shape[0].length;
-        const shapeHeight = shape.length;
-        const offsetX = Math.floor((4 - shapeWidth)/2);
-        const offsetY = Math.floor((4 - shapeHeight)/2);
+        const offsetX = Math.floor((4 - shape[0].length)/2);
+        const offsetY = Math.floor((4 - shape.length)/2);
 
         nextCtx.fillStyle = color;
-        shape.forEach((row, y) => {
+        shape.forEach((row, y) =>
             row.forEach((cell, x) => {
-                if (cell) {
-                    nextCtx.fillRect(
-                        (offsetX + x) * blockSize,
-                        (offsetY + y) * blockSize,
-                        blockSize-1,
-                        blockSize-1
-                    );
-                }
-            });
-        });
+                if(cell) nextCtx.fillRect(
+                    (offsetX + x) * blockSize,
+                    (offsetY + y) * blockSize,
+                    blockSize-1, blockSize-1
+                );
+            })
+        );
     }
 
     function update(time = 0) {
-        if (!game.gameOver && !game.isPaused) {
-            const deltaTime = time - lastTime;
+        if(game.gameOver) {
+            draw();
+            return;
+        }
 
-            if (deltaTime > game.dropInterval) {
-                game.drop();
-                lastTime = time;
-                drawNextPiece(); // Обновляем preview после падения
-            }
+        const deltaTime = time - lastTime;
+        if(deltaTime > game.dropInterval && !game.isPaused) {
+            game.drop();
+            lastTime = time;
+            drawNextPiece();
         }
 
         requestAnimationFrame(update);
@@ -211,51 +217,45 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Рисуем сетку
-        game.grid.forEach((row, y) => {
+        // Grid
+        game.grid.forEach((row, y) =>
             row.forEach((color, x) => {
-                if (color) {
+                if(color) {
                     ctx.fillStyle = color;
-                    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
+                    ctx.fillRect(
+                        x * BLOCK_SIZE,
+                        y * BLOCK_SIZE,
+                        BLOCK_SIZE-1, BLOCK_SIZE-1
+                    );
                 }
-            });
-        });
+            })
+        );
 
-        // Рисуем текущую фигуру
-        if (game.currentPiece) {
+        // Current piece
+        if(game.currentPiece && !game.gameOver) {
             ctx.fillStyle = game.currentPiece.color;
-            game.currentPiece.shape.forEach((row, y) => {
+            game.currentPiece.shape.forEach((row, y) =>
                 row.forEach((cell, x) => {
-                    if (cell) {
-                        ctx.fillRect(
-                            (game.currentPiece.x + x) * BLOCK_SIZE,
-                            (game.currentPiece.y + y) * BLOCK_SIZE,
-                            BLOCK_SIZE-1,
-                            BLOCK_SIZE-1
-                        );
-                    }
-                });
-            });
+                    if(cell) ctx.fillRect(
+                        (game.currentPiece.x + x) * BLOCK_SIZE,
+                        (game.currentPiece.y + y) * BLOCK_SIZE,
+                        BLOCK_SIZE-1, BLOCK_SIZE-1
+                    );
+                })
+            );
         }
 
-        // Рисуем паузу
-        if (game.isPaused) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        // Overlays
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        if(game.isPaused || game.gameOver) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = game.gameOver ? 'red' : 'white';
             ctx.font = '48px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('PAUSE', canvas.width/2, canvas.height/2);
-        }
-
-        // Рисуем Game Over
-        if (game.gameOver) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'red';
-            ctx.font = '48px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2);
+            ctx.fillText(
+                game.gameOver ? 'GAME OVER' : 'PAUSE',
+                canvas.width/2, canvas.height/2
+            );
         }
     }
 
@@ -264,33 +264,24 @@
         document.getElementById('level').textContent = game.level;
     }
 
-    // Управление
-    document.addEventListener('keydown', event => {
-        if (game.gameOver) return;
-        if (event.code === 'KeyP') { // <- проверяем код клавиши
+    // Controls
+    document.addEventListener('keydown', e => {
+        if(game.gameOver) return;
+        if (e.code === 'KeyP') { // <- проверяем код клавиши
             game.isPaused = !game.isPaused;
             if (!game.isPaused) drawNextPiece();
         }
-        switch(event.key.toLowerCase()) {
-
-            case 'arrowleft':
-                if (!game.isPaused) game.move(-1, 0);
-                break;
-            case 'arrowright':
-                if (!game.isPaused) game.move(1, 0);
-                break;
-            case 'arrowdown':
-                if (!game.isPaused) game.move(0, 1);
-                break;
-            case 'arrowup':
-                if (!game.isPaused) game.rotate();
-                break;
+        switch(e.key.toLowerCase()) {
+            case 'arrowleft': game.move(-1, 0); break;
+            case 'arrowright': game.move(1, 0); break;
+            case 'arrowdown': game.move(0, 1); break;
+            case 'arrowup': game.rotate(); break;
         }
         draw();
     });
-    // Первоначальная отрисовка следующей фигуры
+
+    // Start
     drawNextPiece();
-    // Запуск игры
     requestAnimationFrame(update);
 </script>
 </body>
