@@ -3,27 +3,40 @@
 <head>
     <title>JavaScript Tetris</title>
     <style>
+        .game-container {
+            display: flex;
+            gap: 20px;
+        }
         canvas {
             border: 2px solid #333;
         }
         .game-info {
-            margin-left: 20px;
             font-family: Arial, sans-serif;
+        }
+        #next-piece {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
-<canvas id="game" width="300" height="600"></canvas>
-<div class="game-info">
-    <p>Score: <span id="score">0</span></p>
-    <p>Level: <span id="level">1</span></p>
-    <p>Controls:  &#11013; &#10145; &#11015; - move, &#11014; - rotate, P - pause</p>
+<div class="game-container">
+    <canvas id="game" width="300" height="600"></canvas>
+    <div class="game-info">
+        <p>Score: <span id="score">0</span></p>
+        <p>Level: <span id="level">1</span></p>
+        <p>Controls:  &#11013; &#10145; &#11015; - move, &#11014; - rotate, P - pause</p>
+        <canvas id="next-piece" width="120" height="120"></canvas>
+        <p>Next Piece:</p>
+    </div>
 </div>
 
 <script>
     const canvas = document.getElementById('game');
+    const nextPieceCanvas = document.getElementById('next-piece');
     const ctx = canvas.getContext('2d');
+    const nextCtx = nextPieceCanvas.getContext('2d');
     const BLOCK_SIZE = 30;
+    const PREVIEW_SIZE = 120;
     const COLORS = [
         '#00ffff', // I
         '#ffa500', // L
@@ -116,7 +129,7 @@
             shape.forEach((row, dy) => {
                 row.forEach((cell, dx) => {
                     if (cell) {
-                        if (y + dy < 0) {
+                        if (y + dy < 0.1) {
                             this.gameOver = true;
                             return;
                         }
@@ -146,18 +159,46 @@
         }
     }
 
-    // Game Initialization
     const game = new Tetris();
     let lastTime = 0;
+
+    function drawNextPiece() {
+        nextCtx.fillStyle = '#000';
+        nextCtx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+
+        const shape = SHAPES[game.nextPiece];
+        const color = COLORS[game.nextPiece];
+        const blockSize = PREVIEW_SIZE / 4;
+
+        // Центрирование фигуры
+        const shapeWidth = shape[0].length;
+        const shapeHeight = shape.length;
+        const offsetX = Math.floor((4 - shapeWidth)/2);
+        const offsetY = Math.floor((4 - shapeHeight)/2);
+
+        nextCtx.fillStyle = color;
+        shape.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                if (cell) {
+                    nextCtx.fillRect(
+                        (offsetX + x) * blockSize,
+                        (offsetY + y) * blockSize,
+                        blockSize-1,
+                        blockSize-1
+                    );
+                }
+            });
+        });
+    }
 
     function update(time = 0) {
         if (!game.gameOver && !game.isPaused) {
             const deltaTime = time - lastTime;
 
-            // Автоматическое падение
             if (deltaTime > game.dropInterval) {
                 game.drop();
                 lastTime = time;
+                drawNextPiece(); // Обновляем preview после падения
             }
         }
 
@@ -228,6 +269,7 @@
         if (game.gameOver) return;
         if (event.code === 'KeyP') { // <- проверяем код клавиши
             game.isPaused = !game.isPaused;
+            if (!game.isPaused) drawNextPiece();
         }
         switch(event.key.toLowerCase()) {
 
@@ -246,7 +288,8 @@
         }
         draw();
     });
-
+    // Первоначальная отрисовка следующей фигуры
+    drawNextPiece();
     // Запуск игры
     requestAnimationFrame(update);
 </script>
